@@ -12,7 +12,12 @@ def train(architecture='mv3',num_classes=2,learn_rate=1e-4,epochs=10,train_loade
         EPOCHS = epochs
         LEARN_RATE = learn_rate
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
-        model.to('cpu')  # Move model to the device selected for training
+        DEVICE = None
+        if torch.cuda.is_available():
+                DEVICE = 'cuda:0'
+        elif not torch.cuda.is_available():
+                DEVICE='cpu'
+        model.to(DEVICE)  # Move model to the device selected for training
         model.train(True)
         losses = []
         mask_losses = []
@@ -23,9 +28,19 @@ def train(architecture='mv3',num_classes=2,learn_rate=1e-4,epochs=10,train_loade
         for epoch in tqdm(range(EPOCHS)):
                 for ind, (img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale, boxes_aug, target) in enumerate(train_loader):
                         # print(img.shape)
+                        if DEVICE == 'cuda:0':
+                                img = img.to(DEVICE).cuda(non_blocking=True)
+                                hm = hm.to(DEVICE).cuda(non_blocking=True)
+                                reg = reg.to(DEVICE).cuda(non_blocking=True)
+                                wh = wh.to(DEVICE).cuda(non_blocking=True)
+                                reg_mask = reg_mask.to(DEVICE).cuda(non_blocking=True)
+                                inds = inds.to(DEVICE).cuda(non_blocking=True)
                         optimizer.zero_grad()
                         pred_hm, pred_regs = model(img)
-                        p = pred_hm.detach().numpy()
+                        if DEVICE == 'cuda:0':
+                                p = torch.sigmoid(pred_hm).cpu().detach().numpy()
+                        else:
+                                p = torch.sigmoid(pred_hm).detach().numpy()
                         p = p[p>0]
                         if p.size > 0 :
                                 # print("Min confidence: {}, Median confidence: {}, Max Confidence: {}".format(p.min(), np.median(p), p.max()))
