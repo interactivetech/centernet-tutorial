@@ -86,16 +86,35 @@ class centernet(nn.Module):
             basemodel = torchvision.models.mobilenet_v3_small(pretrained=True)
             basemodel = replace_hardswish_with_relu(basemodel)
             basemodel = replace_hardsigmoid(basemodel)
-        if model_name == 'mv2':
-            basemodel = torchvision.models.mobilenetv2(pretrained=False)
+        elif model_name == 'mv2':
+            # basemodel = torchvision.models.mobilenet_v2(pretrained=True,width_mult=0.5)
+            basemodel = torchvision.models.mobilenet_v2(width_mult=0.5)
+
+            # We reuse state dict from mobilenet v2 width width_mult == 1.0.
+            # This is not the optimal way to use pretrained models, but in this case
+            # it gives us good initialization for faster convergence.
+            state_dict = torchvision.models.mobilenet_v2(pretrained=True).state_dict()
+            target_dict = basemodel.state_dict()
+            for k in target_dict.keys():
+                if len(target_dict[k].size()) == 0:
+                    continue
+                state_dict[k] = state_dict[k][:target_dict[k].size(0)]
+                if len(state_dict[k].size()) > 1:
+                    state_dict[k] = state_dict[k][:, :target_dict[k].size(1)]
+
+            basemodel.load_state_dict(state_dict)
             basemodel = replace_hardswish_with_relu(basemodel)
             basemodel = replace_hardsigmoid(basemodel)
         elif model_name == 'resnet18':
             basemodel = torchvision.models.resnet18(pretrained=True) # turn this on for training
         elif model_name == 'resnet34':
             basemodel = torchvision.models.resnet34(pretrained=False) # turn this on for training
-
-        basemodel = nn.Sequential(*list(basemodel.children())[:-2])
+        else:
+            return
+        if model_name == 'mv2':
+            basemodel = nn.Sequential(*(list(basemodel.features.children())[:-1]))
+        else:
+            basemodel = nn.Sequential(*list(basemodel.children())[:-2])
         # set basemodel
         self.base_model = basemodel
         
@@ -104,6 +123,9 @@ class centernet(nn.Module):
         elif model_name == "mv3":
             # num_ch = 960 # for large
             num_ch = 576
+        elif model_name == "mv2":
+            # num_ch = 960 # for large
+            num_ch = 160
         elif model_name == "mobileone":
             num_ch = 1024
         else:
