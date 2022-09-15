@@ -36,7 +36,7 @@ def _reg_loss(regr, gt_regr, mask):
   gt_regr = gt_regr * mask
 #   print("regr: ",regr.shape)
 #   print("gt_regr: ",gt_regr)
-  regr_loss = nn.functional.l1_loss(regr, gt_regr, size_average=False)
+  regr_loss = nn.functional.l1_loss(regr, gt_regr, reduction='sum')
 #   print("regr_loss: ",regr_loss)
   regr_loss = regr_loss / (num + 1e-4)
   return regr_loss

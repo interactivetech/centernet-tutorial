@@ -311,3 +311,28 @@ def filter_and_nms(bboxes, scores,classes,nms_threshold=0.6,n_top_scores=None ):
         classes = []
     
     return bboxes_xyxy, scores, classes
+
+def per_class_coco_ap(coco,coco_eval):
+    results_per_category=[]
+    precisions = coco_eval.eval['precision']
+    cats =  [i['id'] for i in coco.cats.values()]
+    # print(cats)
+    for idx, catId in enumerate(cats):
+        # print(catId)
+        # area range index 0: all area ranges
+        # max dets index -1: typically 100 per image
+        nm = coco.loadCats([catId])
+        # print(nm[0]['name'])
+        # print("precisions: ",precisions.shape)
+        precision = precisions[:, :, idx, 0, -1]
+        # print("precision:", precision.shape)
+        # for ind, row in enumerate(precision):
+            # print(ind,row)
+        precision = precision[precision > -1]
+        if precision.size:
+            ap = np.mean(precision)
+        else:
+            ap = float('nan')
+        results_per_category.append(
+            (f'{nm[0]["name"]}', f'{float(ap):0.3f}'))
+    return results_per_category

@@ -5,7 +5,8 @@ __pycache__/
 
 *.png
 *.json
-*gif
+*.gif
+*.pth
 runs/
 # C extensions
 *.so
