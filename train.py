@@ -22,7 +22,7 @@ def train(architecture='mv3',
           writer=None,
           multi_gpu=False,
           visualize_res=None,
-          IMG_RESOLUTION=512):
+          IMG_RESOLUTION=None):
         model = centernet(num_classes,model_name=architecture)
         if multi_gpu:
                 model = torch.nn.DataParallel(model,device_ids=[0,1,2,3],output_device=[0])
@@ -110,7 +110,7 @@ def train(architecture='mv3',
                 
                 if epoch > 0 and epoch%10==0:
                         # Val
-                        val(model,val_ds,val_loader, writer,epoch)
+                        val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION)
                         model.train()
                         # im0 = Image.fromarray(i0)
                         # im1 = Image.fromarray(i1)

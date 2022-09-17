@@ -103,7 +103,7 @@ def rescale_boxes( boxes, out_size, intermediate_size, scale):
     
     return boxes
 
-def val(model,val_ds,val_loader,writer,epoch,visualize_res=128,IMG_RESOLUTION=512):
+def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=None):
     model.eval()
     # DEVICE = torch.device("cpu")
     detections = []
@@ -250,7 +250,13 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=128,IMG_RESOLUTION=51
             cv2.rectangle(test_pred,(x,y),(x+w,y+h),(0,0,255),3)
     writer.add_image('test_pred', test_pred, epoch, dataformats='HWC')
 
-    visualize_and_report_perf(img,pred_hm=pred_hm,pred_regs=pred_regs,target = targets,writer=writer,total_ind=epoch,visualize_res=visualize_res)
+    visualize_and_report_perf(img,
+                              pred_hm=pred_hm,
+                              pred_regs=pred_regs,
+                              target = targets,
+                              writer=writer,
+                              total_ind=epoch,
+                              visualize_res=visualize_res)
     print(len(detections))
     if len(detections) > 0:
         json.dump(detections, open('res.json', 'w'))
