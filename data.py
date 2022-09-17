@@ -219,7 +219,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
         # print("img: ",img.shape)
         # print("target: ",target)
         # print( inds, in_size, out_size, intermediate_size, scale)
-        return img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale, boxes_aug, target
+        return img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale, boxes_aug, target, idx
         # return img, hm,reg, cat_wh,cat_reg_mask,inds 
 def coco_detection_collate_fn(batch):
     img = torch.Tensor(np.stack([x[0] for x in batch], axis=0))
@@ -235,5 +235,6 @@ def coco_detection_collate_fn(batch):
     # print(np.vstack([x[10] for x in batch]).shape)
     boxes_aug = torch.Tensor(np.vstack([x[10] for x in batch]))
     targets = [x[11] for x in batch]
+    idxs = [x[12] for x in batch]
 
-    return img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale, boxes_aug, targets
+    return img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale, boxes_aug, targets, idxs

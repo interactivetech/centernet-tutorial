@@ -7,6 +7,85 @@ import json
 from model import centernet
 from data import COCODetectionDataset, coco_detection_collate_fn, train_transform_norm, validation_transform_norm
 # from val import val
+from torchvision.utils import make_grid
+import cv2
+from compute_map import compute_map, index_pred_and_gt_by_class
+from time import time
+def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visualize_res):
+                i = make_grid(img)
+                # print(i.shape)
+                if torch.cuda.is_available():
+                        i = i.permute(1,2,0).cpu().detach().numpy()
+                else:
+                        i = i.permute(1,2,0).detach().numpy()
+                mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                img_u = i*std + mean# unnormalize
+                img_u = (img_u*255.).astype(np.uint8)
+                writer.add_image('im', img_u, total_ind, dataformats='HWC')
+                # print("i: ",img_u.shape)
+                # im = Image.fromarray(img_u)
+                # im.save('im.png')
+
+                i = make_grid(pred_hm,nrow=4).permute(1,2,0)
+                # print("ii: ",i.shape)
+                if torch.cuda.is_available():
+                        i0 = i[:,:,0].cpu().detach().numpy()
+                        i1 = i[:,:,1].cpu().detach().numpy()
+                else:
+                        i0 = i[:,:,0].detach().numpy()
+                        i1 = i[:,:,1].detach().numpy()
+                # print("i: ",i.shape)
+                i0 = np.dstack([i0*255]*3).astype(np.uint8)
+                i1 = np.dstack([i1*255]*3).astype(np.uint8)
+                
+                # for i in range(hm.shape[1]):
+
+                # hm_gt = hm[0].cpu().data.numpy()[i]
+                # for i in range(pred_hm.shape[1]):
+                for q in range(pred_hm.shape[0]):
+                    bboxes,scores,classes = pred2box_multiclass(pred_hm[q].cpu().detach().numpy(),
+                                                                pred_regs[q].cpu().detach().numpy(),visualize_res,1,thresh=0.25)
+                    boxes,scores,classes =  filter_and_nms(bboxes,scores,classes,nms_threshold=0.6,n_top_scores=100)
+                    if torch.cuda.is_available():
+                            # print(pred_hm.shape)
+                            hm_pred = pred_hm[q].cpu().data.numpy()
+                            hm_pred2 = hm_pred.sum(0)
+                            h,w = hm_pred2.shape
+                            # print("hm_pred2: ", hm_pred2.shape)
+                            hm_pred = np.dstack([hm_pred2*255]*3).astype(np.uint8)
+
+                    else:
+                            hm_pred = pred_hm[q].data.numpy()
+                            hm_pred2 = hm_pred.sum(0)
+                            h,w = hm_pred2.shape
+                            print("hm_pred2: ", hm_pred2.shape)
+                            hm_pred = np.dstack([hm_pred2*255]*3).astype(np.uint8)
+                    for b,c in zip(boxes,classes):
+                            x,y,x2,y2 = [int(k) for k in b]
+                            # print('pred: ',x,y,x2,y2)
+                            if c == 0:
+                                    # x,y,x2,y2 = [int(k) for k in b]
+                                    # print(x,y)
+                                    cv2.rectangle(hm_pred,(x,y),(x2,y2),(255,0,0,125),1)
+                            if c == 1:
+                                    # x,y,x2,y2 = [int(k) for k in b]
+                                    # print(x,y)
+                                    cv2.rectangle(hm_pred,(x,y),(x2,y2),(0,255,0,125),1)
+                    for b in target[q]['boxes']:
+                            # b0 = b/2.0
+                            # print(b)
+                            b = [int(k)//4 for k in b]# to allow original bbox be visualized on heatmap
+                            x,y,w,h = b
+                            # print(x,y,w,h )
+                            # print("gt: ",x,y,w,h)
+                            # print("gt2: ",x,y,x+w,y+h)
+                            cv2.rectangle(hm_pred,(x,y),(x+w,y+h),(0,0,255,125),1)
+                    writer.add_image('hm_pred_{}'.format(q), hm_pred, total_ind, dataformats='HWC')
+
+  
+                writer.add_image('hm_0', i0, total_ind, dataformats='HWC')
+                writer.add_image('hm_1', i1, total_ind, dataformats='HWC')
 def rescale_boxes( boxes, out_size, intermediate_size, scale):
     """ Removes padding shift and rescales bounding boxes to original
     input image size """
@@ -24,10 +103,28 @@ def rescale_boxes( boxes, out_size, intermediate_size, scale):
     
     return boxes
 
-def val(model,val_ds,val_loader):
-    
+def val(model,val_ds,val_loader,writer,epoch,visualize_res=128,IMG_RESOLUTION=512):
+    model.eval()
+    # DEVICE = torch.device("cpu")
     detections = []
-    for img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale,boxes_aug, targets  in tqdm(val_loader):
+    gt = {}
+    pred = {}
+    for img, hm, reg, wh,reg_mask,inds, in_size, out_size, intermediate_size, scale,boxes_aug, targets, idxs  in tqdm(val_loader):
+            # print("idxs: ",idxs)
+            
+            for t in targets:
+                gt[t['image_id']]= {
+                        'boxes':[[int(i[0]),int(i[1]),int(i[0])+int(i[2]),int(i[1])+int(i[3])] for i in  t['boxes']],
+                        'classes':t['labels']
+                        }
+
+        #     print(gt)
+            # img = img.to(DEVICE)
+            # hm = hm.to(DEVICE)
+            # reg = reg.to(DEVICE)
+            # wh = wh.to(DEVICE)
+            # reg_mask = reg_mask.to(DEVICE)
+            # inds = inds.to(DEVICE)
             image_ids = [i['image_id'] for i in targets]
             bboxes_gt = np.vstack([np.array(i['boxes']) for i in targets])
             # for b in bboxes_gt:
@@ -45,7 +142,7 @@ def val(model,val_ds,val_loader):
                             # bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
                             #                                         pred_regs[ind].cpu().detach().numpy(),512,4,thresh=0.0)
                             bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
-                                                                    pred_regs[ind].cpu().detach().numpy(),512,4,thresh=0.25)
+                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,4,thresh=0.25)
 
                             # print(out_size[ind].numpy().tolist(),intermediate_size[ind].numpy().tolist(),scale[ind].numpy())
                             # print("bboxes.shape: ",bboxes.shape)
@@ -55,7 +152,7 @@ def val(model,val_ds,val_loader):
                             # print("bboxes-pred: ",bboxes[0])
 
                             # expects xywh
-                            # bboxes = rescale_boxes(bboxes,out_size[ind].numpy().tolist(),intermediate_size[ind].numpy().tolist(),scale[ind].numpy() )
+                            bboxes = rescale_boxes(bboxes,out_size[ind].numpy().tolist(),intermediate_size[ind].numpy().tolist(),scale[ind].numpy() )
                             # print("bboxes_gt: ",bboxes_gt)
                             # print("bboxes: ",bboxes)
 
@@ -64,6 +161,7 @@ def val(model,val_ds,val_loader):
                             # bboxes[:,3] =  bboxes[:,3] - bboxes[:,1]
                             # print("bboxes: ",bboxes.shape)
                             bboxes,scores,classes =  filter_and_nms(bboxes,scores,classes,nms_threshold=0.6,n_top_scores=100)
+                            
                             # print("nms - bboxes: ",len(bboxes))
 
                             # print("bboxes: ", bboxes.shape)
@@ -81,10 +179,20 @@ def val(model,val_ds,val_loader):
                             #     plt.imshow(h)
                             #     plt.title("Epoch: {} Ex: {}, Class: {} preds".format(epoch,0,cl))
                             #     plt.savefig("pred_bboxes_mult_300_{}.png".format(cl))
-
+                           
                             # ---
-                            for ind,(b,s,c) in enumerate(zip(bboxes,scores,classes)):
+                            pred[image_id] = {
+                                'boxes': [],
+                                'scores': [],
+                                'classes': []
+                            }
+                            for indy,(b,s,c) in enumerate(zip(bboxes,scores,classes)):
                                 x,y,x2,y2 = b
+                                # print([int(x),int(y),int(x2),int(y2)])
+                                # print(int(c))
+                                pred[image_id]['boxes'].append([int(x),int(y),int(x2),int(y2)])
+                                pred[image_id]['scores'].append(float(s))
+                                pred[image_id]['classes'].append(int(c))
                                 # print("classes: ",c)
                                 # print(" x,y,x2,y2: ", x,y,x2,y2)
                                 w = x2-x
@@ -102,24 +210,98 @@ def val(model,val_ds,val_loader):
                                         'score': float(s),
                                     }
                                 detections.append(detection)
+
                         except Exception as e:
                             print(e)
                             continue
-    json.dump(detections, open('res.json', 'w'))
-    coco_dets = val_ds.coco.loadRes('res.json')
-    coco_eval = COCOeval(val_ds.coco, coco_dets, "bbox")
-    coco_eval.evaluate()
-    coco_eval.accumulate()
-    coco_eval.summarize()
-    model.eval()
-    results_per_category = per_class_coco_ap(val_ds.coco,coco_eval)
-    print(results_per_category)
+                        break
+    
+
+    h,w =in_size[ind].numpy()
+#     print("h,w: ",h,w)
+    test_pred = np.zeros((int(h),int(w),3)).astype(np.uint8)
+    for b,c in zip(bboxes,classes):
+        x,y,x2,y2 = [int(k) for k in b]
+        # print('pred: ',x,y,x2,y2)
+        if c == 0:
+                # x,y,x2,y2 = [int(k) for k in b]
+                # print(x,y)
+                cv2.rectangle(test_pred,(x,y),(x2,y2),(255,0,0),3)
+        if c == 1:
+                # x,y,x2,y2 = [int(k) for k in b]
+                # print(x,y)
+                cv2.rectangle(test_pred,(x,y),(x2,y2),(0,255,0),3)
+        if c == 2:
+                # x,y,x2,y2 = [int(k) for k in b]
+                # print(x,y)
+                cv2.rectangle(test_pred,(x,y),(x2,y2),(255,255,0),3)
+        if c == 3:
+                # x,y,x2,y2 = [int(k) for k in b]
+                # print(x,y)
+                cv2.rectangle(test_pred,(x,y),(x2,y2),(0,255,255),3)
+    for b in targets[ind]['boxes']:
+            # b0 = b/2.0
+            # print(b)
+            b = [int(k) for k in b]
+            x,y,w,h = b
+        #     print("gt: ",x,y,x+w,y+h )
+            # print("gt: ",x,y,w,h)
+            # print("gt2: ",x,y,x+w,y+h)
+            cv2.rectangle(test_pred,(x,y),(x+w,y+h),(0,0,255),3)
+    writer.add_image('test_pred', test_pred, epoch, dataformats='HWC')
+
+    visualize_and_report_perf(img,pred_hm=pred_hm,pred_regs=pred_regs,target = targets,writer=writer,total_ind=epoch,visualize_res=visualize_res)
+    print(len(detections))
+    if len(detections) > 0:
+        json.dump(detections, open('res.json', 'w'))
+        coco_dets = val_ds.coco.loadRes('res.json')
+        coco_eval = COCOeval(val_ds.coco, coco_dets, "bbox")
+        coco_eval.evaluate()
+        coco_eval.accumulate()
+        coco_eval.summarize()
+        model.eval()
+        results_per_category = per_class_coco_ap(val_ds.coco,coco_eval)
+        print(results_per_category)
+        # [('circle', '0.006'), ('rectangle', '0.001')]
+        cls_names = []
+        for i in results_per_category:
+            cls_name = i[0]
+            cls_names.append(i[0])
+            mAP_val = float(i[1])
+            print(cls_name,mAP_val)
+            if writer is not None:
+                writer.add_scalar("{} coco mAP/val".format(cls_name), mAP_val, epoch)
+        print("Computing mAP (Non COCO)...")
+        t0 = time()
+        maps = []
+        for c_ind,c in enumerate(cls_names):
+                p,g = index_pred_and_gt_by_class(pred,gt,c_ind)
+                mAP = compute_map(g,p,c_ind)
+                maps.append(mAP[c_ind])
+                print("{}-mAP: {}".format(c,mAP[c_ind]))
+                if writer is not None:
+                        writer.add_scalar("{} mAP/val".format(c), mAP[c_ind], epoch)
+        print("mAP calculation completed! Time: {}".format(time() - t0))
+        mean_mAP = np.array(maps).mean()
+        print("mean mAP: {}".format(mean_mAP))
+        if writer is not None:
+                writer.add_scalar("mAP/val".format(c), mean_mAP, epoch)
+    # writer.add_scalar("Loss/train", loss.item(), total_ind)
+    #                     writer.add_scalar("Mask Loss/train", mask_loss.item(), total_ind)
+    #                     writer.add_scalar("Reg Loss/train", regr_loss.item(), total_ind)
 
 if __name__ == '__main__':
-    val_ds = COCODetectionDataset(img_dir='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial',
-                    ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
-                    IMG_RESOLUTION=512,
-                    transform=validation_transform_norm)
+    # val_ds = COCODetectionDataset(img_dir='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial',
+    #                 ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
+    #                 IMG_RESOLUTION=512,
+    #                 transform=validation_transform_norm)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+    #                      transform=validation_transform_norm)
+    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+        '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+        transform=validation_transform_norm,
+        IMG_RESOLUTION=512)
     val_loader = torch.utils.data.DataLoader(val_ds,
                                             batch_size=1,
                                             shuffle=False,
@@ -128,9 +310,9 @@ if __name__ == '__main__':
                                             collate_fn = coco_detection_collate_fn)
     
     ckpt = torch.load("centernet_300.pth",map_location='cpu')
-    model = centernet(2,model_name='mv2')
+    model = centernet(val_ds.num_classes,model_name='mv2')
     model.load_state_dict(ckpt)
     model.eval()
     # print(model)
-    val(model,val_ds=val_ds,val_loader=val_loader)
+    val(model,val_ds=val_ds,val_loader=val_loader,writer=None,epoch=0)
 
