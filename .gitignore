@@ -8,6 +8,7 @@ __pycache__/
 *.gif
 *.pth
 runs/
+original_centernet_runs/
 # C extensions
 *.so
 

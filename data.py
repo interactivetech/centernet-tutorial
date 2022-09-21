@@ -84,6 +84,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
                  img_dir,
                  ann_json,
                  IMG_RESOLUTION=512,
+                 MODEL_SCALE=None,
                  transform=None):
         # self.img_id = img_id
         # self.labels = labels
@@ -150,6 +151,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
         self.coco = coco
         self.img_dir = img_dir
         self.img_names = img_names
+        self.MODEL_SCALE = MODEL_SCALE
         self.targets = targets
         self.transform = transform
         self.num_classes = len(cat_ids)
@@ -193,7 +195,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
                                                                 labels,
                                                                 N_CLASSES=self.num_classes,
                                                                 input_size=self.IMG_RESOLUTION,
-                                                                MODEL_SCALE=4,
+                                                                MODEL_SCALE=self.MODEL_SCALE,
                                                                 IN_SCALE=1,
                                                                 MAX_N_OBJECTS=128)
 

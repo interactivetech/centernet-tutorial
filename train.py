@@ -12,6 +12,8 @@ import cv2
 import torch
 from PIL import Image
 from val import val
+from efficient_centernet_model import EfficientCenternet
+
 def train(architecture='mv3',
           num_classes=2,
           learn_rate=1e-4,
@@ -23,7 +25,10 @@ def train(architecture='mv3',
           multi_gpu=False,
           visualize_res=None,
           IMG_RESOLUTION=None):
-        model = centernet(num_classes,model_name=architecture)
+        if architecture == 'emv2':
+                model = EfficientCenternet(num_classes=num_classes)
+        else:
+                model = centernet(num_classes,model_name=architecture)
         if multi_gpu:
                 model = torch.nn.DataParallel(model,device_ids=[0,1,2,3],output_device=[0])
         EPOCHS = epochs

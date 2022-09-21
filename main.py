@@ -8,6 +8,7 @@ from data import COCODetectionDataset, coco_detection_collate_fn, train_transfor
 from tqdm import tqdm
 import numpy as np
 from model import centernet
+from efficient_centernet_model import EfficientCenternet
 from loss import centerloss4
 from train import train
 from utils import pred2box_multiclass, filter_and_nms
@@ -19,21 +20,23 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
     IMG_RESOLUTION=256
 
-    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-    #                      transform=train_transform_norm)
-    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-    #                      transform=validation_transform_norm)
+    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+                         MODEL_SCALE=1,
+                         transform=train_transform_norm)
+    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+                         MODEL_SCALE=1,
+                         transform=validation_transform_norm)
     
-    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
-    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
-    transform=train_transform_norm,
-    IMG_RESOLUTION=IMG_RESOLUTION)
-    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
-    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
-    transform=validation_transform_norm,
-    IMG_RESOLUTION=IMG_RESOLUTION)
+    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    # transform=train_transform_norm,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    # transform=validation_transform_norm,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
     # ds = COCODetectionDataset(img_dir='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial',
     #             ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
     #             IMG_RESOLUTION=512,
@@ -59,10 +62,25 @@ if __name__ == '__main__':
     LR = 1e-3
     # LR = 2.5e-4*BATCH_SIZE
     from torch.utils.tensorboard import SummaryWriter
-    writer = SummaryWriter(comment='mv2')
+    # writer = SummaryWriter(comment='mv2')
+    writer = SummaryWriter(comment='emv2')
+
     multi_gpu=True
-    visualize_res=IMG_RESOLUTION//4
-    model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('mv2',
+    # visualize_res=IMG_RESOLUTION//4
+    visualize_res=IMG_RESOLUTION
+
+    # model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('mv2',
+    #                                                                                                         ds.num_classes,
+    #                                                                                                         learn_rate=LR,
+    #                                                                                                         epochs=300,
+    #                                                                                                         train_loader=train_loader,
+    #                                                                                                         val_ds=val_ds,
+    #                                                                                                         val_loader=val_loader,
+    #                                                                                                         writer=writer,
+    #                                                                                                         multi_gpu=multi_gpu,
+    #                                                                                                         visualize_res=visualize_res,
+    #                                                                                                         IMG_RESOLUTION=IMG_RESOLUTION)
+    model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('emv2',
                                                                                                             ds.num_classes,
                                                                                                             learn_rate=LR,
                                                                                                             epochs=300,
