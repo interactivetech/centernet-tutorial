@@ -59,7 +59,7 @@ def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visu
                             hm_pred = pred_hm[q].data.numpy()
                             hm_pred2 = hm_pred.sum(0)
                             h,w = hm_pred2.shape
-                            print("hm_pred2: ", hm_pred2.shape)
+                        #     print("hm_pred2: ", hm_pred2.shape)
                             hm_pred = np.dstack([hm_pred2*255]*3).astype(np.uint8)
                     for b,c in zip(boxes,classes):
                             x,y,x2,y2 = [int(k) for k in b]
@@ -72,15 +72,24 @@ def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visu
                                     # x,y,x2,y2 = [int(k) for k in b]
                                     # print(x,y)
                                     cv2.rectangle(hm_pred,(x,y),(x2,y2),(0,255,0,125),1)
+                    '''# add if you want to see scaled ground truth for heatmap
+                    # challenge: spec dataset is 1440x1920, versus synth dataset is 512x512
+                    # easy to scale boxes for synth, but need custom scaled bbox to get scaled gt boxes
                     for b in target[q]['boxes']:
                             # b0 = b/2.0
                             # print(b)
-                            b = [int(k)//4 for k in b]# to allow original bbox be visualized on heatmap
+                            # this is for original heatmap resolution (Native//4)
+                        #     b = [int(k)//4 for k in b]# to allow original bbox be visualized on heatmap
+                            # new efficient center net native res is 
+                            b = [int(k)//2 for k in b]# to allow original bbox be visualized on heatmap
+
                             x,y,w,h = b
                             # print(x,y,w,h )
                             # print("gt: ",x,y,w,h)
                             # print("gt2: ",x,y,x+w,y+h)
                             cv2.rectangle(hm_pred,(x,y),(x+w,y+h),(0,0,255,125),1)
+                    '''
+                    print("hm_pred: ",hm_pred.shape)
                     writer.add_image('hm_pred_{}'.format(q), hm_pred, total_ind, dataformats='HWC')
 
   
@@ -142,9 +151,12 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                             # bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
                             #                                         pred_regs[ind].cpu().detach().numpy(),512,4,thresh=0.0)
                             bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
-                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,4,thresh=0.25)
+                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,1,thresh=0.25)
 
-                            # print(out_size[ind].numpy().tolist(),intermediate_size[ind].numpy().tolist(),scale[ind].numpy())
+                        #     print(in_size[ind].numpy().tolist(),
+                        #           out_size[ind].numpy().tolist(),
+                        #           intermediate_size[ind].numpy().tolist(),
+                        #           scale[ind].numpy())
                             # print("bboxes.shape: ",bboxes.shape)
 
                             # bboxes = np.array([bboxes[:,0],bboxes[:,1],bboxes[:,0]+bboxes[:,2],bboxes[:,1]+bboxes[:,3]]).T

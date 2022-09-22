@@ -15,28 +15,41 @@ from utils import pred2box_multiclass, filter_and_nms
 import cv2
 from val import val
 import matplotlib.pyplot as plt
-
-
+import random
+import os
+def seed_everything(seed=1):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    
+seed_everything()
 if __name__ == '__main__':
     IMG_RESOLUTION=256
 
-    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-                         MODEL_SCALE=1,
-                         transform=train_transform_norm)
-    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-                         MODEL_SCALE=1,
-                         transform=validation_transform_norm)
+    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+    #                      MODEL_SCALE=1,
+    #                      transform=train_transform_norm,
+    #                      IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+    #                      MODEL_SCALE=1,
+    #                      transform=validation_transform_norm,
+    #                      IMG_RESOLUTION=IMG_RESOLUTION)
     
-    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
-    # transform=train_transform_norm,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
-    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
-    # transform=validation_transform_norm,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
+    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    transform=train_transform_norm,
+    MODEL_SCALE=1,
+    IMG_RESOLUTION=IMG_RESOLUTION)
+    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    transform=validation_transform_norm,
+    MODEL_SCALE=1,
+    IMG_RESOLUTION=IMG_RESOLUTION)
     # ds = COCODetectionDataset(img_dir='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial',
     #             ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
     #             IMG_RESOLUTION=512,
@@ -92,9 +105,9 @@ if __name__ == '__main__':
                                                                                                             visualize_res=visualize_res,
                                                                                                             IMG_RESOLUTION=IMG_RESOLUTION)
     if multi_gpu:
-        torch.save(model.module.state_dict(),'centernet_{}.pth'.format(300))
+        torch.save(model.module.state_dict(),'efficient_centernet_{}_fruit.pth'.format(300))
     else:
-        torch.save(model.state_dict(),'centernet_{}.pth'.format(300))
+        torch.save(model.state_dict(),'efficient_centernet_{}_fruit.pth'.format(300))
     plt.plot(range(len(losses)),losses )
     plt.plot(range(len(losses)),mask_losses)
     plt.plot(range(len(losses)),regr_losses)

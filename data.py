@@ -83,7 +83,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
     def __init__(self,
                  img_dir,
                  ann_json,
-                 IMG_RESOLUTION=512,
+                 IMG_RESOLUTION=None,
                  MODEL_SCALE=None,
                  transform=None):
         # self.img_id = img_id
