@@ -85,9 +85,12 @@ def neg_loss3(pred, gt):
   neg_weights = torch.pow(1 - gt, 4)
 
   loss = 0
-  prob_pred = F.sigmoid(pred)
-  pos_loss = F.logsigmoid(pred) * torch.pow(1 - prob_pred, 2) * pos_inds
-  neg_loss = F.logsigmoid(1 - pred) * torch.pow(prob_pred, 2) * neg_inds *  neg_weights 
+  # prob_pred = F.logsigmoid(pred)
+  # pos_loss = F.logsigmoid(pred) * torch.pow(1 - prob_pred, 3) * pos_inds
+  # neg_loss = F.logsigmoid(1 - pred) * torch.pow(prob_pred, 3) * neg_inds *  neg_weights 
+  pred = torch.clamp(torch.sigmoid(pred), min=1e-4, max=1 - 1e-4)
+  pos_loss = torch.log(pred) * torch.pow(1 - pred, 3) * pos_inds
+  neg_loss = torch.log(1 - pred) * torch.pow(pred, 3) * neg_weights * neg_inds
 
   num_pos  = pos_inds.float().sum()
   pos_loss = pos_loss.sum()
@@ -118,5 +121,5 @@ def centerloss4(pred_hm, hm,pred_regr, regr,mask,inds,wh,weight=0.4, size_averag
     # print("wh: ",wh)
     regr_loss = _reg_loss(pred,wh,mask)
 
-    loss = mask_loss + regr_loss   
+    loss =mask_loss + regr_loss   
     return loss ,mask_loss , regr_loss

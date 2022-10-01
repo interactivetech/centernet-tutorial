@@ -24,6 +24,7 @@ def train_transform_norm(annotations,INPUT_SIZE,with_bboxes=True):
         [
             albu.RandomSizedBBoxSafeCrop(*intermediate_size),
             # albu.Resize(height = intermediate_size[0],width = intermediate_size[1]),
+            # albu.Resize(*intermediate_size),
             albu.HorizontalFlip(p=0.5),
             albu.HueSaturationValue(p=0.5),
             albu.RGBShift(p=0.5),
@@ -35,9 +36,10 @@ def train_transform_norm(annotations,INPUT_SIZE,with_bboxes=True):
         albu.BboxParams(format='coco', min_area=0.0,
                         min_visibility=0.0, label_fields=['labels'])
     )
-
+    
     augmented = augmentation(**annotations)
-    # augmented['image'] = augmented['image'].astype(
+
+    augmented['scale'] = scale    # augmented['image'] = augmented['image'].astype(
     #     np.float32).transpose(2, 0, 1)
     augmented['scale'] = scale
 
@@ -70,7 +72,10 @@ def validation_transform_norm(annotations, INPUT_SIZE,with_bboxes=True):
         ],
         bbox_params
     )
-    augmented = augmentation(**annotations)
+    try:
+        augmented = augmentation(**annotations)
+    except Exception as e:
+        print(annotations)
     augmented['scale'] = scale
 
     augmented['in_size'] = image.shape[:2]
@@ -130,7 +135,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
             boxes = []
             labels = []
             for ann in img_anns:
-                if ann['bbox'][2] > 0 or ann['bbox'][3] > 0:
+                if ann['bbox'][2] > 0 and ann['bbox'][3] > 0:
                     boxes.append(ann['bbox'])
                     labels.append(label_map[ann['category_id']])
             t = {
@@ -174,9 +179,10 @@ class COCODetectionDataset(torch.utils.data.Dataset):
         annotations = {'image': img,
                 'bboxes':boxes,
                 'labels': labels }
-
-        anns = self.transform(annotations,(self.IMG_RESOLUTION,self.IMG_RESOLUTION))
-
+        try:
+            anns = self.transform(annotations,(self.IMG_RESOLUTION,self.IMG_RESOLUTION))
+        except Exception as e:
+            print(annotations)
 
         
         img  = anns['image'].transpose(2,0,1)
@@ -191,6 +197,7 @@ class COCODetectionDataset(torch.utils.data.Dataset):
 
         if self.num_classes >1:
             # print("boxes_aug: ",boxes_aug)
+            # print("Model Scale: ",self.MODEL_SCALE)
             hm, reg,wh,reg_mask,inds  = make_hm_regr_multiclass(boxes_aug,
                                                                 labels,
                                                                 N_CLASSES=self.num_classes,
@@ -214,9 +221,20 @@ class COCODetectionDataset(torch.utils.data.Dataset):
         elif self.num_classes ==1:
             # boxes = np.array(target['boxes']).reshape(-1,4)
             # labels = np.array(target['labels'])
-            hm,reg,wh,reg_mask,inds = make_hm_regr(boxes_aug,input_size=self.IMG_RESOLUTION,MODEL_SCALE=4,IN_SCALE=1)
+            hm, reg,wh,reg_mask,inds  = make_hm_regr_multiclass(boxes_aug,
+                                                                labels,
+                                                                N_CLASSES=self.num_classes,
+                                                                input_size=self.IMG_RESOLUTION,
+                                                                MODEL_SCALE=self.MODEL_SCALE,
+                                                                IN_SCALE=1,
+                                                                MAX_N_OBJECTS=128)
+            hm = np.ascontiguousarray(hm)
+            reg = np.ascontiguousarray(reg)
+            wh = np.ascontiguousarray(wh)
+            reg_mask = np.ascontiguousarray(reg_mask)
+            inds = np.ascontiguousarray(inds)
             # hm,reg,wh,reg_mask,inds = make_hm_regr2(boxes,input_size=512,IN_SCALE=1,MODEL_SCALE=4,gauss='msra',MAX_N_OBJECTS=128)
-            hm = np.expand_dims(hm,0)
+            # hm = np.expand_dims(hm,0)
         # print("target: ",target)
         # print("img: ",img.shape)
         # print("target: ",target)

@@ -17,6 +17,8 @@ import random
 import os
 
 import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--local_rank', type=int, default=0)
 
 
 def seed_everything(seed=1):
@@ -28,31 +30,29 @@ def seed_everything(seed=1):
     torch.backends.cudnn.deterministic = True
     
 seed_everything()
-if __name__ == '__main__':
-    IMG_RESOLUTION=256 
-    # Shapes Dataset
-    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-                         MODEL_SCALE=1,
-                         transform=train_transform_norm,
-                         IMG_RESOLUTION=IMG_RESOLUTION)
-    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
-                         '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
-                         MODEL_SCALE=1,
-                         transform=validation_transform_norm,
-                         IMG_RESOLUTION=IMG_RESOLUTION)
-    
-    # Food COCO DATASET
-    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_train2017.json',
-    # transform=train_transform_norm,
-    # MODEL_SCALE=1,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
-    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_val2017.json',
-    # transform=validation_transform_norm,
-    # MODEL_SCALE=1,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
+def main(args):
+    # IMG_RESOLUTION=384 
+    IMG_RESOLUTION=256
+    visualize_res=64
+    MODEL_SCALE=IMG_RESOLUTION//visualize_res
+    torch.cuda.set_device ( args.local_rank ) # use set_device and cuda to specify the desired GPU
+    torch.distributed.init_process_group(
+    'nccl',
+        init_method='env://',
+        world_size=4,
+        rank=args.local_rank,
+    )
+    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+    #                      MODEL_SCALE=MODEL_SCALE,
+    #                      transform=train_transform_norm,
+    #                      IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
+    #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
+    #                      MODEL_SCALE=MODEL_SCALE,
+    #                      transform=validation_transform_norm,
+    #                      IMG_RESOLUTION=IMG_RESOLUTION)
+    # Specs Fruit Dataset
     # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
     # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
     # transform=train_transform_norm,
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # MODEL_SCALE=1,
     # IMG_RESOLUTION=IMG_RESOLUTION)
 
-    # MINI COCO DATASET
+    # # MINI COCO DATASET
     # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
     # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_minitrain2017.json',
     # transform=train_transform_norm,
@@ -87,7 +87,36 @@ if __name__ == '__main__':
     # transform=validation_transform_norm,
     # MODEL_SCALE=1,
     # IMG_RESOLUTION=IMG_RESOLUTION)
-    
+
+    # # Food COCO DATASET
+    ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_train2017.json',
+    transform=train_transform_norm,
+    MODEL_SCALE=MODEL_SCALE,
+    IMG_RESOLUTION=IMG_RESOLUTION)
+    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_val2017.json',
+    transform=validation_transform_norm,
+    MODEL_SCALE=MODEL_SCALE,
+    IMG_RESOLUTION=IMG_RESOLUTION)
+
+    # Banana COCO DATASET
+    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_banana_train2017.json',
+    # transform=train_transform_norm,
+    # MODEL_SCALE=1,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_banana_train2017.json',
+    # transform=validation_transform_norm,
+    # MODEL_SCALE=1,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_banana_val2017.json',
+    # transform=validation_transform_norm,
+    # MODEL_SCALE=1,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
+
     # ds = COCODetectionDataset(img_dir='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial',
     #             ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
     #             IMG_RESOLUTION=512,
@@ -96,34 +125,53 @@ if __name__ == '__main__':
     #                 ann_json='/Users/mendeza/Documents/projects/cent-tutorial/centernet-tutorial/tutorial/coco_shapes.json',
     #                 IMG_RESOLUTION=512,
     #                 transform=validation_transform_norm)
-    # BATCH_SIZE = 32
-    BATCH_SIZE = 32
-
+    # BATCH_SIZE = 72
+    BATCH_SIZE = 72
+    # Distributed Sampler has own shuffling mechanism, only use shuffle in sampler ranther than dataloader
+    # https://github.com/NVIDIA/tacotron2/issues/168#issuecomment-474578149
+    samp = torch.utils.data.distributed.DistributedSampler(ds,shuffle=True)
+    t_sampler = torch.utils.data.distributed.DistributedSampler(val_ds,shuffle=False)
+    # generator = torch.Generator()
+    # generator.manual_seed(0)
     train_loader = torch.utils.data.DataLoader(ds,
                                             batch_size=BATCH_SIZE,
-                                            shuffle=True,
                                             num_workers=8,
                                             pin_memory=True,
-                                            collate_fn = coco_detection_collate_fn)
+                                            sampler=samp,
+                                            collate_fn = coco_detection_collate_fn,
+                                            generator=None)
+    print("Len of Train Loader: ",len(train_loader))
     val_loader = torch.utils.data.DataLoader(val_ds,
                                             batch_size=1,
-                                            shuffle=False,
                                             num_workers=0,
+                                            sampler=None,
                                             pin_memory=True,
-                                            collate_fn = coco_detection_collate_fn)
+                                            collate_fn = coco_detection_collate_fn,
+                                            generator=None)
+    print("Len of Val Loader: ",len(val_loader))
+    # val_loader = torch.utils.data.DataLoader(val_ds,
+    #                                         batch_size=1,
+    #                                         num_workers=0,
+    #                                         pin_memory=True,
+    #                                         collate_fn = coco_detection_collate_fn,
+    #                                         generator=generator)
     
-    # LR = 1e-2
     LR = 1e-3
+    # LR = 5e-4
+    # LR = 0.05
+    # LR=5e-4
+    # LR = 0.02
     # LR = 2.5e-4*BATCH_SIZE
     from torch.utils.tensorboard import SummaryWriter
     # writer = SummaryWriter(comment='mv2')
-    # writer = SummaryWriter(comment='_mini_coco_emv2')
-    writer = SummaryWriter(comment='_emv2_test')
-
+    print("args.local_rank: ",args.local_rank)
+    writer=None
+    if args.local_rank == 0:
+        # writer = SummaryWriter(comment='_shape_mv2')
+        writer = SummaryWriter(comment='_efd')
 
     multi_gpu=True
-    # visualize_res=IMG_RESOLUTION//4
-    visualize_res=IMG_RESOLUTION
+    # visualize_res=IMG_RESOLUTION
 
     # model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('mv2',
     #                                                                                                         ds.num_classes,
@@ -136,21 +184,22 @@ if __name__ == '__main__':
     #                                                                                                         multi_gpu=multi_gpu,
     #                                                                                                         visualize_res=visualize_res,
     #                                                                                                         IMG_RESOLUTION=IMG_RESOLUTION)
-    model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('emv2',
+    model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('efd',
                                                                                                             ds.num_classes,
                                                                                                             learn_rate=LR,
-                                                                                                            epochs=300,
+                                                                                                            epochs=700,
                                                                                                             train_loader=train_loader,
                                                                                                             val_ds=val_ds,
                                                                                                             val_loader=val_loader,
                                                                                                             writer=writer,
                                                                                                             multi_gpu=multi_gpu,
                                                                                                             visualize_res=visualize_res,
-                                                                                                            IMG_RESOLUTION=IMG_RESOLUTION)
+                                                                                                            IMG_RESOLUTION=IMG_RESOLUTION,
+                                                                                                            local_rank=args.local_rank)
     if multi_gpu:
-        torch.save(model.module.state_dict(),'efficient_centernet_{}_mini_coco_fruit.pth'.format(300))
+        torch.save(model.module.state_dict(),'ddp_efficient_centernet_{}.pth'.format(300))
     else:
-        torch.save(model.state_dict(),'efficient_centernet_{}_fruit.pth'.format(300))
+        torch.save(model.state_dict(),'efficient_centernet_{}.pth'.format(300))
     plt.plot(range(len(losses)),losses )
     plt.plot(range(len(losses)),mask_losses)
     plt.plot(range(len(losses)),regr_losses)
@@ -217,3 +266,7 @@ if __name__ == '__main__':
         plt.title("prediction centerpoints for Class {} from model".format(i))
         plt.imshow(hm_pred)
         plt.savefig("hm_preds.png")
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    main(args)

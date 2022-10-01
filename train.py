@@ -12,7 +12,15 @@ import cv2
 import torch
 from PIL import Image
 from val import val
-from efficient_centernet_model import EfficientCenternet
+from efficient_centernet_model import EfficientCenternet, EfficientCenternet3, EfficientCenterDet
+
+import torch.distributed as dist
+
+def reduce_mean(tensor, nprocs):
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= nprocs
+    return rt
 
 def train(architecture='mv3',
           num_classes=2,
@@ -24,22 +32,45 @@ def train(architecture='mv3',
           writer=None,
           multi_gpu=False,
           visualize_res=None,
-          IMG_RESOLUTION=None):
+          IMG_RESOLUTION=None,
+          local_rank=None):
         if architecture == 'emv2':
+                print("emv2")
                 model = EfficientCenternet(num_classes=num_classes)
-        else:
+        elif architecture == 'emv3':
+                model = EfficientCenternet3(num_classes=num_classes)
+        elif architecture == 'efd':
+                model = EfficientCenterDet(num_classes=num_classes)
+        elif architecture != 'emv2' and architecture != 'emv3' and architecture != 'efd':   
+                print("else")
                 model = centernet(num_classes,model_name=architecture)
-        if multi_gpu:
+        
+        if multi_gpu and local_rank is None:
+                # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
                 model = torch.nn.DataParallel(model,device_ids=[0,1,2,3],output_device=[0])
+
+                # model = torch.nn.parallel.DistributedDataParallel(model,device_ids=[local_rank],output_device=[local_rank])
+        elif multi_gpu and local_rank is not None:
+                model = model.to(local_rank)
+                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+                model = torch.nn.parallel.DistributedDataParallel(model,device_ids=[local_rank],output_device=[local_rank])
+
+
         EPOCHS = epochs
         LEARN_RATE = learn_rate
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
+        # optimizer = torch.optim.SGD(model.parameters(),lr=LEARN_RATE,weight_decay=1e-4,momentum=0.9)
         DEVICE = None
-        if torch.cuda.is_available():
-                DEVICE = 'cuda:0'
+        if torch.cuda.is_available() and local_rank is None:
+                # DEVICE = torch.device('cuda:{}'.format(local_rank))
+                DEVICE = torch.device('cuda:{}'.format(0))
+        elif torch.cuda.is_available() and local_rank is not None:
+                DEVICE = torch.device('cuda:{}'.format(local_rank))
         elif not torch.cuda.is_available():
                 DEVICE='cpu'
+        print(DEVICE)
         model.to(DEVICE)  # Move model to the device selected for training
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[200,400], gamma=0.1)
         losses = []
         mask_losses = []
         regr_losses = []
@@ -60,19 +91,19 @@ def train(architecture='mv3',
                           scale,
                           boxes_aug,
                           target,
-                          idxs) in enumerate(train_loader):
+                          idxs) in enumerate(tqdm(train_loader)):
                         # print(img.shape)
                         # print(in_size)
                         # print(out_size)
                         # print("idxs: ",idxs)
                         bboxes_gt = np.vstack([np.array(i['boxes']) for i in target])
-                        if DEVICE == 'cuda:0':
-                                img = img.to(DEVICE).cuda(non_blocking=True)
-                                hm = hm.to(DEVICE).cuda(non_blocking=True)
-                                reg = reg.to(DEVICE).cuda(non_blocking=True)
-                                wh = wh.to(DEVICE).cuda(non_blocking=True)
-                                reg_mask = reg_mask.to(DEVICE).cuda(non_blocking=True)
-                                inds = inds.to(DEVICE).cuda(non_blocking=True)
+                        # if DEVICE == 'cuda:0':
+                        img = img.to(DEVICE).cuda(non_blocking=True)
+                        hm = hm.to(DEVICE).cuda(non_blocking=True)
+                        reg = reg.to(DEVICE).cuda(non_blocking=True)
+                        wh = wh.to(DEVICE).cuda(non_blocking=True)
+                        reg_mask = reg_mask.to(DEVICE).cuda(non_blocking=True)
+                        inds = inds.to(DEVICE).cuda(non_blocking=True)
                         
                         optimizer.zero_grad()
                         # print("begin")
@@ -81,9 +112,14 @@ def train(architecture='mv3',
 
 
                         loss,mask_loss,regr_loss = centerloss4(pred_hm,hm,pred_regs,reg,reg_mask,inds,wh)
+                        # if local_rank is not None:
+                        #         # torch.distributed.barrier()'s role is to block the process and ensure that each process runs all the code before this line of code before it can continue to execute, so that the average loss and average acc will not appear because of the process execution speed. inconsistent error
+                        #         torch.distributed.barrier()
+                        #         reduced_loss = reduce_mean(loss, 8)
                         loss.backward()
                         optimizer.step()
-                        pred_hm = torch.sigmoid(pred_hm)
+                        with torch.no_grad():
+                                pred_hm = torch.sigmoid(pred_hm).detach()
                         p = pred_hm[pred_hm>0]
                         if len(p.size()) > 0 :
                                 # print("Min confidence: {}, Median confidence: {}, Max Confidence: {}".format(p.min(), np.median(p), p.max()))
@@ -98,10 +134,22 @@ def train(architecture='mv3',
                         losses.append(loss.item())
                         mask_losses.append(mask_loss.item())
                         regr_losses.append(regr_loss.item())
-                        writer.add_scalar("Loss/train", loss.item(), total_ind)
-                        writer.add_scalar("Mask Loss/train", mask_loss.item(), total_ind)
-                        writer.add_scalar("Reg Loss/train", regr_loss.item(), total_ind)
-                        writer.add_scalar("Max Conf Score/train", max_confidences[-1], total_ind)
+                        if local_rank is not None and local_rank ==0:
+                                writer.add_scalar("Loss/train", loss.item(), total_ind)
+                                writer.add_scalar("Mask Loss/train", mask_loss.item(), total_ind)
+                                writer.add_scalar("Reg Loss/train", regr_loss.item(), total_ind)
+                                writer.add_scalar("Max Conf Score/train", max_confidences[-1], total_ind)
+                                lr = lr_scheduler.get_lr()[0]
+                                # print(lr)
+                                if writer is not None:
+                                        writer.add_scalar("Learn Rate/train",lr, total_ind)
+
+
+                        elif writer is not None:
+                                writer.add_scalar("Loss/train", loss.item(), total_ind)
+                                writer.add_scalar("Mask Loss/train", mask_loss.item(), total_ind)
+                                writer.add_scalar("Reg Loss/train", regr_loss.item(), total_ind)
+                                writer.add_scalar("Max Conf Score/train", max_confidences[-1], total_ind)
                         total_ind+=1
 
                 # if p.size > 0:
@@ -115,13 +163,18 @@ def train(architecture='mv3',
                 
                 if epoch > 0 and epoch%10==0:
                         # Val
-                        val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION)
-                        model.train()
+                        if local_rank is not None and local_rank==0:
+                                val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION,device=DEVICE)
+                                model.train()
+                        elif writer is not None:
+                                val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION,device=None)
+                                model.train()
                         # im0 = Image.fromarray(i0)
                         # im1 = Image.fromarray(i1)
                         # im0.save('hm_0.png')
                         # im1.save('hm_1.png')
-
-        writer.flush()
-        writer.close()
+                lr_scheduler.step()
+        if writer is not None:
+                writer.flush()
+                writer.close()
         return model,losses,mask_losses,regr_losses, min_confidences, median_confidences, max_confidences

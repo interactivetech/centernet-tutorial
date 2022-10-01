@@ -11,7 +11,7 @@ from torchvision.utils import make_grid
 import cv2
 from compute_map import compute_map, index_pred_and_gt_by_class
 from time import time
-def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visualize_res):
+def visualize_and_report_perf(img,pred_hm,pred_regs,gt_hm,target,writer,total_ind,visualize_res):
                 i = make_grid(img)
                 # print(i.shape)
                 if torch.cuda.is_available():
@@ -22,22 +22,37 @@ def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visu
                 std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
                 img_u = i*std + mean# unnormalize
                 img_u = (img_u*255.).astype(np.uint8)
-                writer.add_image('im', img_u, total_ind, dataformats='HWC')
+                if writer is not None:
+                    writer.add_image('im', img_u, total_ind, dataformats='HWC')
                 # print("i: ",img_u.shape)
                 # im = Image.fromarray(img_u)
                 # im.save('im.png')
-
-                i = make_grid(pred_hm,nrow=4).permute(1,2,0)
-                # print("ii: ",i.shape)
                 if torch.cuda.is_available():
-                        i0 = i[:,:,0].cpu().detach().numpy()
-                        i1 = i[:,:,1].cpu().detach().numpy()
+                    # print("pred_hm: ", pred_hm.shape)
+                    i = pred_hm.cpu().detach()[0].sum(0)#BNHW->HW
+                    ii= gt_hm.cpu().detach()[0].sum(0)#BNHW->HW
+                    # print("i: ", i.shape)
                 else:
-                        i0 = i[:,:,0].detach().numpy()
-                        i1 = i[:,:,1].detach().numpy()
+                    i = pred_hm.detach()[0].sum(0)
+                    ii= gt_hm.detach()[0].sum(0)
+                # i = make_grid(pred_hm,nrow=4).permute(1,2,0)
+                # ii = make_grid(gt_hm,nrow=4).permute(1,2,0)
+
+                # print("ii: ",i.shape)
+                # if torch.cuda.is_available():
+                #         i0 = i[:,:].detach().numpy()
+                #         i1 = i[:,:].detach().numpy()
+                #         ii0 = ii[:,:].detach().numpy()
+                #         ii1 = ii[:,:].detach().numpy()
+                # else:
+                #         i0 = i[:,:].detach().numpy()
+                #         i1 = i[:,:].detach().numpy()
+                #         ii0 = ii[:,:].detach().numpy()
+                #         ii1 = ii[:,:].detach().numpy()
                 # print("i: ",i.shape)
-                i0 = np.dstack([i0*255]*3).astype(np.uint8)
-                i1 = np.dstack([i1*255]*3).astype(np.uint8)
+                # print("ii: ",ii.shape)
+                i = np.dstack([i*255]*3).astype(np.uint8)
+                ii = np.dstack([ii*255]*3).astype(np.uint8)
                 
                 # for i in range(hm.shape[1]):
 
@@ -90,11 +105,12 @@ def visualize_and_report_perf(img,pred_hm,pred_regs,target,writer,total_ind,visu
                             cv2.rectangle(hm_pred,(x,y),(x+w,y+h),(0,0,255,125),1)
                     '''
                     print("hm_pred: ",hm_pred.shape)
-                    writer.add_image('hm_pred_{}'.format(q), hm_pred, total_ind, dataformats='HWC')
+                    if writer is not None:
+                        writer.add_image('hm_pred_{}'.format(q), hm_pred, total_ind, dataformats='HWC')
 
-  
-                writer.add_image('hm_0', i0, total_ind, dataformats='HWC')
-                writer.add_image('hm_1', i1, total_ind, dataformats='HWC')
+                if writer is not None:
+                    writer.add_image('pred_hm', i, total_ind, dataformats='HWC')
+                    writer.add_image('gt_hm', ii, total_ind, dataformats='HWC')
 def rescale_boxes( boxes, out_size, intermediate_size, scale):
     """ Removes padding shift and rescales bounding boxes to original
     input image size """
@@ -112,7 +128,10 @@ def rescale_boxes( boxes, out_size, intermediate_size, scale):
     
     return boxes
 
-def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=None):
+def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=None,device=None):
+#     n_threads = torch.get_num_threads()
+    # FIXME remove this and make paste_masks_in_image run on the GPU
+#     torch.set_num_threads(1)
     model.eval()
     # DEVICE = torch.device("cpu")
     detections = []
@@ -128,12 +147,13 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                         }
 
         #     print(gt)
-            # img = img.to(DEVICE)
-            # hm = hm.to(DEVICE)
-            # reg = reg.to(DEVICE)
-            # wh = wh.to(DEVICE)
-            # reg_mask = reg_mask.to(DEVICE)
-            # inds = inds.to(DEVICE)
+            if device is not None:
+                img = img.to(device)
+                hm = hm.to(device)
+                reg = reg.to(device)
+                wh = wh.to(device)
+                reg_mask = reg_mask.to(device)
+                inds = inds.to(device)
             image_ids = [i['image_id'] for i in targets]
             bboxes_gt = np.vstack([np.array(i['boxes']) for i in targets])
             # for b in bboxes_gt:
@@ -151,7 +171,7 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                             # bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
                             #                                         pred_regs[ind].cpu().detach().numpy(),512,4,thresh=0.0)
                             bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
-                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,1,thresh=0.25)
+                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,IMG_RESOLUTION//visualize_res,thresh=0.25)
 
                         #     print(in_size[ind].numpy().tolist(),
                         #           out_size[ind].numpy().tolist(),
@@ -260,15 +280,16 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
             # print("gt: ",x,y,w,h)
             # print("gt2: ",x,y,x+w,y+h)
             cv2.rectangle(test_pred,(x,y),(x+w,y+h),(0,0,255),3)
-    writer.add_image('test_pred', test_pred, epoch, dataformats='HWC')
-
-    visualize_and_report_perf(img,
-                              pred_hm=pred_hm,
-                              pred_regs=pred_regs,
-                              target = targets,
-                              writer=writer,
-                              total_ind=epoch,
-                              visualize_res=visualize_res)
+    if writer is not None:
+        writer.add_image('test_pred', test_pred, epoch, dataformats='HWC')
+        visualize_and_report_perf(img,
+                                pred_hm=pred_hm,
+                                pred_regs=pred_regs,
+                                gt_hm=hm,
+                                target = targets,
+                                writer=writer,
+                                total_ind=epoch,
+                                visualize_res=visualize_res)
     print(len(detections))
     if len(detections) > 0:
         json.dump(detections, open('res.json', 'w'))
@@ -292,18 +313,26 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
         print("Computing mAP (Non COCO)...")
         t0 = time()
         maps = []
-        for c_ind,c in enumerate(cls_names):
+        maps_50 = []
+        for c_ind,c in enumerate(tqdm(cls_names)):
                 p,g = index_pred_and_gt_by_class(pred,gt,c_ind)
                 mAP = compute_map(g,p,c_ind)
                 maps.append(mAP[c_ind])
+                maps_50.append(mAP[str(c_ind)+'_50'])
                 print("{}-mAP: {}".format(c,mAP[c_ind]))
+                print("{}-mAP_50: {}".format(c,mAP[str(c_ind)+'_50']))
                 if writer is not None:
                         writer.add_scalar("{} mAP/val".format(c), mAP[c_ind], epoch)
+                        writer.add_scalar("{} mAP/val".format(c+'_50'), mAP[str(c_ind)+'_50'], epoch)
         print("mAP calculation completed! Time: {}".format(time() - t0))
         mean_mAP = np.array(maps).mean()
+        mean_mAP_50 = np.array(maps_50).mean()
         print("mean mAP: {}".format(mean_mAP))
+        print("mean mAP 50: {}".format(mean_mAP_50))
         if writer is not None:
                 writer.add_scalar("mAP/val".format(c), mean_mAP, epoch)
+                writer.add_scalar("mAP_50/val".format(c), mean_mAP_50, epoch)
+        # torch.set_num_threads(n_threads)
     # writer.add_scalar("Loss/train", loss.item(), total_ind)
     #                     writer.add_scalar("Mask Loss/train", mask_loss.item(), total_ind)
     #                     writer.add_scalar("Reg Loss/train", regr_loss.item(), total_ind)

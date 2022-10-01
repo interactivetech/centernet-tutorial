@@ -180,8 +180,11 @@ def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=
         centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
         for ind,(c,l )in enumerate(zip(centers,classes)):
             h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
+            # print("h, w: ",h,w)
             radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+            # print("radius: ",radius)
             radius = max(0, int(radius))
+            # print("radius: ",radius)
             # print("radius:", radius)
             draw_umich_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
                                     radius)

@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
+from tqdm import tqdm
 sns.set_style('white')
 sns.set_context('poster')
 
@@ -323,12 +323,15 @@ def index_pred_and_gt_by_class(pred_boxes,gt_boxes, c):
 def compute_map(gt,pred,cl_name):
     avg_precs = []
     iou_thrs = []
-    for idx, iou_thr in enumerate(np.linspace(0.5, 0.95, 10)):
+    mAP_50 = -10
+    for idx, iou_thr in enumerate(tqdm(np.linspace(0.5, 0.95, 10))):
         data = get_avg_precision_at_iou(gt, pred, iou_thr=iou_thr)
+        if mAP_50 == -10:
+            mAP_50 = data['avg_prec']
         avg_precs.append(data['avg_prec'])
     mAP = np.mean(avg_precs)
     # print('class {} - map: {:.2f}'.format(cl_name,mAP))
-    return {cl_name: mAP}
+    return {cl_name: mAP,str(cl_name)+'_50': mAP_50}
 # Andrew(9.16.2022): code to computer per class mAP
 if __name__ == "__main__":
 
