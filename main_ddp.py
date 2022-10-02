@@ -33,7 +33,7 @@ seed_everything()
 def main(args):
     # IMG_RESOLUTION=384 
     IMG_RESOLUTION=256
-    visualize_res=64
+    visualize_res=128
     MODEL_SCALE=IMG_RESOLUTION//visualize_res
     torch.cuda.set_device ( args.local_rank ) # use set_device and cuda to specify the desired GPU
     torch.distributed.init_process_group(
@@ -77,28 +77,28 @@ def main(args):
     # IMG_RESOLUTION=IMG_RESOLUTION)
 
     # # MINI COCO DATASET
-    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_minitrain2017.json',
-    # transform=train_transform_norm,
-    # MODEL_SCALE=1,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
-    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
-    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_val2017.json',
-    # transform=validation_transform_norm,
-    # MODEL_SCALE=1,
-    # IMG_RESOLUTION=IMG_RESOLUTION)
-
-    # # Food COCO DATASET
     ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
-    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_train2017.json',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_minitrain2017.json',
     transform=train_transform_norm,
     MODEL_SCALE=MODEL_SCALE,
     IMG_RESOLUTION=IMG_RESOLUTION)
     val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
-    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_val2017.json',
+    '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_val2017.json',
     transform=validation_transform_norm,
     MODEL_SCALE=MODEL_SCALE,
     IMG_RESOLUTION=IMG_RESOLUTION)
+
+    # # Food COCO DATASET
+    # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_train2017.json',
+    # transform=train_transform_norm,
+    # MODEL_SCALE=MODEL_SCALE,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
+    # '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_food_val2017.json',
+    # transform=validation_transform_norm,
+    # MODEL_SCALE=MODEL_SCALE,
+    # IMG_RESOLUTION=IMG_RESOLUTION)
 
     # Banana COCO DATASET
     # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/train2017',
@@ -126,7 +126,9 @@ def main(args):
     #                 IMG_RESOLUTION=512,
     #                 transform=validation_transform_norm)
     # BATCH_SIZE = 72
-    BATCH_SIZE = 72
+    # BATCH_SIZE = 72
+    BATCH_SIZE = 32
+
     # Distributed Sampler has own shuffling mechanism, only use shuffle in sampler ranther than dataloader
     # https://github.com/NVIDIA/tacotron2/issues/168#issuecomment-474578149
     samp = torch.utils.data.distributed.DistributedSampler(ds,shuffle=True)
@@ -172,7 +174,7 @@ def main(args):
 
     multi_gpu=True
     # visualize_res=IMG_RESOLUTION
-
+    EPOCHS = 401
     # model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('mv2',
     #                                                                                                         ds.num_classes,
     #                                                                                                         learn_rate=LR,
@@ -187,7 +189,7 @@ def main(args):
     model, losses, mask_losses, regr_losses, min_confidences, median_confidences, max_confidences = train('efd',
                                                                                                             ds.num_classes,
                                                                                                             learn_rate=LR,
-                                                                                                            epochs=700,
+                                                                                                            epochs=EPOCHS,
                                                                                                             train_loader=train_loader,
                                                                                                             val_ds=val_ds,
                                                                                                             val_loader=val_loader,
@@ -197,9 +199,9 @@ def main(args):
                                                                                                             IMG_RESOLUTION=IMG_RESOLUTION,
                                                                                                             local_rank=args.local_rank)
     if multi_gpu:
-        torch.save(model.module.state_dict(),'ddp_efficient_centernet_{}.pth'.format(300))
+        torch.save(model.module.state_dict(),'ddp_efficient_centernet_{}_coco_pre.pth'.format(EPOCHS))
     else:
-        torch.save(model.state_dict(),'efficient_centernet_{}.pth'.format(300))
+        torch.save(model.state_dict(),'efficient_centernet_{}.pth'.format(EPOCHS))
     plt.plot(range(len(losses)),losses )
     plt.plot(range(len(losses)),mask_losses)
     plt.plot(range(len(losses)),regr_losses)

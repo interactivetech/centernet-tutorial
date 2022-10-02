@@ -418,12 +418,18 @@ class EfficientCenterDet(nn.Module):
         self.avg_pool = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
         self.stage_out_channels = [16,16,48]
 
-        self.SPP = SPP(sum(self.stage_out_channels),96)
+        self.SPP = SPP(sum(self.stage_out_channels),128)
         init_conv_layers(self.SPP)
-        self.conv1x1 = Conv1x1(96,96)
-        init_conv_layers(self.conv1x1)
-        self.cls_head  = Head(96,self.num_classes)
-        self.reg_head = Head(96,2)
+        self.conv1x1_1 = Conv1x1(128,128)
+        init_conv_layers(self.conv1x1_1)
+        self.conv1x1_2 = Conv1x1(128,128)
+        init_conv_layers(self.conv1x1_2)
+
+        self.conv1x1_3 = Conv1x1(128,128)
+        init_conv_layers(self.conv1x1_3)
+
+        self.cls_head  = Head(128,self.num_classes)
+        self.reg_head = Head(128,2)
 
     def forward(self,x):
         '''
@@ -444,11 +450,14 @@ class EfficientCenterDet(nn.Module):
 
         y = self.SPP(P)#[2, 336, 22, 22]->[1, 96, 32, 32]
         # print("y: ",y.shape)
-        y = self.conv1x1(y)# -> [1, 96, 32, 32])
+        y = self.conv1x1_1(y)# -> [1, 96, 32, 32])
         # print("y: ",y.shape)
-
-        outc = self.cls_head(self.upsample(y))
-        outr = self.reg_head(self.upsample(y))
+        y = self.upsample(y)
+        y = self.conv1x1_2(y)
+        y = self.upsample(y)
+        y = self.conv1x1_3(y)
+        outc = self.cls_head(y)
+        outr = self.reg_head(y)
         return outc, outr
 if __name__ == '__main__':
     # model = EfficientCenternet()

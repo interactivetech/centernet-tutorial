@@ -70,7 +70,7 @@ def train(architecture='mv3',
                 DEVICE='cpu'
         print(DEVICE)
         model.to(DEVICE)  # Move model to the device selected for training
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[200,400], gamma=0.1)
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[200,300], gamma=0.1)
         losses = []
         mask_losses = []
         regr_losses = []
@@ -161,10 +161,12 @@ def train(architecture='mv3',
                 # if epoch > 0 and epoch%10==0:
                 # print(img.shape)
                 
-                if epoch > 0 and epoch%10==0:
+                if epoch > 0 and epoch%50==0:
                         # Val
                         if local_rank is not None and local_rank==0:
                                 val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION,device=DEVICE)
+                                if multi_gpu:
+                                        torch.save(model.module.state_dict(),'ddp_efficient_centernet_{}.pth'.format(epoch))
                                 model.train()
                         elif writer is not None:
                                 val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION,device=None)
