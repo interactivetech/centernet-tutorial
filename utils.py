@@ -42,6 +42,27 @@ def gaussian_radius(det_size, min_overlap=0.7):
   sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
   r3  = (b3 + sq3) / 2
   return min(r1, r2, r3)
+
+def gaussian_radius2(det_size, min_overlap):
+    height, width = det_size
+
+    a1  = 1
+    b1  = (height + width)
+    c1  = width * height * (1 - min_overlap) / (1 + min_overlap)
+    sq1 = np.sqrt(b1 ** 2 - 4 * a1 * c1)
+    r1  = (b1 - sq1) / (2 * a1)
+
+    a2  = 4
+    b2  = 2 * (height + width)
+    c2  = (1 - min_overlap) * width * height
+    sq2 = np.sqrt(b2 ** 2 - 4 * a2 * c2)
+    r2  = (b2 - sq2) / (2 * a2)
+
+    a3  = 4 * min_overlap
+    b3  = -2 * min_overlap * (height + width)
+    c3  = (min_overlap - 1) * width * height
+    sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
+    r3  = (b3 + sq3) / (2 * a3)
 def gaussian2D(shape, sigma=1):
     m, n = [(ss - 1.) / 2. for ss in shape]
     y, x = np.ogrid[-m:m+1,-n:n+1]
@@ -80,7 +101,8 @@ def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=
         centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
         for ind,(c,l )in enumerate(zip(centers,classes)):
             h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
-            radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+            # radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+            radius = gaussian_radius2((math.ceil(h), math.ceil(w)))
             radius = max(0, int(radius))
             # print("radius:", radius)
             draw_umich_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
