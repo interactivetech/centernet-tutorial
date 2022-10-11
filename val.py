@@ -5,6 +5,7 @@ from utils import pred2box_multiclass, filter_and_nms, per_class_coco_ap
 from tqdm import tqdm
 import json
 from model import centernet
+from efficient_centernet_model import EfficientCenterDet
 from data import COCODetectionDataset, coco_detection_collate_fn, train_transform_norm, validation_transform_norm
 # from val import val
 from torchvision.utils import make_grid
@@ -171,7 +172,7 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                             # bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
                             #                                         pred_regs[ind].cpu().detach().numpy(),512,4,thresh=0.0)
                             bboxes,scores,classes = pred2box_multiclass(pred_hm[ind].cpu().detach().numpy(),
-                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,IMG_RESOLUTION//visualize_res,thresh=0.25)
+                                                                    pred_regs[ind].cpu().detach().numpy(),IMG_RESOLUTION,IMG_RESOLUTION//visualize_res,thresh=0.05)
 
                         #     print(in_size[ind].numpy().tolist(),
                         #           out_size[ind].numpy().tolist(),
@@ -345,10 +346,15 @@ if __name__ == '__main__':
     # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
     #                      '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/coco_shapes.json',
     #                      transform=validation_transform_norm)
-    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
-        '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    # val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/images',
+    #     '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/fruit_specs_dataset/annotations/coco-specs-fruit.json',
+    #     transform=validation_transform_norm,
+    #     IMG_RESOLUTION=512)
+    val_ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/val2017',
+        '/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/coco_dataset/annotations/instances_val2017.json',
         transform=validation_transform_norm,
-        IMG_RESOLUTION=512)
+        MODEL_SCALE=2,
+        IMG_RESOLUTION=256)
     val_loader = torch.utils.data.DataLoader(val_ds,
                                             batch_size=1,
                                             shuffle=False,
@@ -356,10 +362,21 @@ if __name__ == '__main__':
                                             pin_memory=True,
                                             collate_fn = coco_detection_collate_fn)
     
-    ckpt = torch.load("centernet_300.pth",map_location='cpu')
-    model = centernet(val_ds.num_classes,model_name='mv2')
+    ckpt = torch.load("/home/projects/centernet-tutorial/ddp_efficient_centernet_250.pth",map_location='cpu')
+    # model = centernet(val_ds.num_classes,model_name='efd')
+    print("val_ds.num_classes: ",val_ds.num_classes)
+    model = EfficientCenterDet(num_classes=val_ds.num_classes)
     model.load_state_dict(ckpt)
     model.eval()
     # print(model)
-    val(model,val_ds=val_ds,val_loader=val_loader,writer=None,epoch=0)
+    # val(model,val_ds=val_ds,val_loader=val_loader,writer=None,epoch=0)
+    val(model,
+        val_ds,
+        val_loader,
+         None,
+         0,
+         visualize_res=128,
+         IMG_RESOLUTION=256,
+         device=None)
+
 

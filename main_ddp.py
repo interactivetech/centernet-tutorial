@@ -11,6 +11,7 @@ from loss import centerloss4
 from train import train
 from utils import pred2box_multiclass, filter_and_nms
 import cv2
+import datetime
 from val import val
 import matplotlib.pyplot as plt
 import random
@@ -40,6 +41,7 @@ def main(args):
     'nccl',
         init_method='env://',
         world_size=4,
+        timeout=datetime.timedelta(seconds=7200),
         rank=args.local_rank,
     )
     # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',
@@ -127,7 +129,7 @@ def main(args):
     #                 transform=validation_transform_norm)
     # BATCH_SIZE = 72
     # BATCH_SIZE = 72
-    BATCH_SIZE = 32
+    BATCH_SIZE = 52
 
     # Distributed Sampler has own shuffling mechanism, only use shuffle in sampler ranther than dataloader
     # https://github.com/NVIDIA/tacotron2/issues/168#issuecomment-474578149

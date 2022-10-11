@@ -210,9 +210,9 @@ def make_hm_regr_multiclass2(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE
     feature_scale =input_size//MODEL_SCALE
     hm = np.zeros((N_CLASSES,feature_scale,feature_scale))
     reg = np.zeros((2,feature_scale,feature_scale))
-    centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
+    centers = np.array([(bboxes[:,0]+bboxes[:,2])//2,(bboxes[:,1]+bboxes[:,3])//2,bboxes[:,2],bboxes[:,3]]).T
     for ind,(c,l )in enumerate(zip(centers,classes)):
-        h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
+        w , h =  c[2]/MODEL_SCALE, c[3]/MODEL_SCALE
         radius = gaussian_radius((math.ceil(h), math.ceil(w)))
         radius = max(0, int(radius))
         # print("radius:", radius)
