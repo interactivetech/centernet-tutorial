@@ -43,10 +43,7 @@ def gaussian_radius(det_size, min_overlap=0.7):
   r3  = (b3 + sq3) / 2
   return min(r1, r2, r3)
 
-def gaussian_radius2(det_size, min_overlap):
-    '''
-    Fixes bug described in: https://github.com/xingyizhou/CenterNet/issues/273
-    '''
+def gaussian_radius2(det_size, min_overlap=0.7):
     height, width = det_size
 
     a1  = 1
@@ -66,6 +63,8 @@ def gaussian_radius2(det_size, min_overlap):
     c3  = (min_overlap - 1) * width * height
     sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
     r3  = (b3 + sq3) / (2 * a3)
+    return min(r1, r2, r3)
+
 def gaussian2D(shape, sigma=1):
     m, n = [(ss - 1.) / 2. for ss in shape]
     y, x = np.ogrid[-m:m+1,-n:n+1]
@@ -91,36 +90,36 @@ def draw_umich_gaussian(heatmap, center, radius, k=1):
     np.maximum(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
   return heatmap
 
-def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=4,IN_SCALE=1,MAX_N_OBJECTS=128):
-    reg_mask = np.zeros((MAX_N_OBJECTS),dtype=np.uint8)
-    wh = np.zeros((MAX_N_OBJECTS,2),dtype=np.float32)
-    inds = np.zeros((MAX_N_OBJECTS),dtype=np.int64)
-    feature_scale =input_size//MODEL_SCALE
-    hm = np.zeros((N_CLASSES,feature_scale,feature_scale))
-    reg = np.zeros((2,feature_scale,feature_scale))
-    try:
-      # print("bboxes: ",bboxes.shape)
-      if bboxes is not None:
-        centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
-        for ind,(c,l )in enumerate(zip(centers,classes)):
-            h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
-            # radius = gaussian_radius((math.ceil(h), math.ceil(w)))
-            radius = gaussian_radius2((math.ceil(h), math.ceil(w)))
-            radius = max(0, int(radius))
-            # print("radius:", radius)
-            draw_umich_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
-                                    radius)
-            # draw_msra_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
-            #                         radius)
-            reg_mask[ind] = 1
-            wh[ind] = c[2:]/input_size
-            draw_dense_reg(reg,hm[l],c[:2]//MODEL_SCALE,wh[ind],radius)
+# def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=4,IN_SCALE=1,MAX_N_OBJECTS=128):
+#     reg_mask = np.zeros((MAX_N_OBJECTS),dtype=np.uint8)
+#     wh = np.zeros((MAX_N_OBJECTS,2),dtype=np.float32)
+#     inds = np.zeros((MAX_N_OBJECTS),dtype=np.int64)
+#     feature_scale =input_size//MODEL_SCALE
+#     hm = np.zeros((N_CLASSES,feature_scale,feature_scale))
+#     reg = np.zeros((2,feature_scale,feature_scale))
+#     try:
+#       # print("bboxes: ",bboxes.shape)
+#       if bboxes is not None:
+#         centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
+#         for ind,(c,l )in enumerate(zip(centers,classes)):
+#             h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
+#             # radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+#             radius = gaussian_radius2((math.ceil(h), math.ceil(w)))
+#             radius = max(0, int(radius))
+#             # print("radius:", radius)
+#             draw_umich_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
+#                                     radius)
+#             # draw_msra_gaussian(hm[l], [int(c[0])//MODEL_SCALE,int(c[1])//MODEL_SCALE], 
+#             #                         radius)
+#             reg_mask[ind] = 1
+#             wh[ind] = c[2:]/input_size
+#             draw_dense_reg(reg,hm[l],c[:2]//MODEL_SCALE,wh[ind],radius)
 
 
-            inds[ind] = (int(c[1])//MODEL_SCALE)*feature_scale + (int(c[0])//MODEL_SCALE)
-    except Exception as e:
-      print(e)
-      print("bboxes: ",bboxes.shape)
+#             inds[ind] = (int(c[1])//MODEL_SCALE)*feature_scale + (int(c[0])//MODEL_SCALE)
+#     except Exception as e:
+#       print(e)
+#       print("bboxes: ",bboxes.shape)
 
 def draw_dense_reg(regmap, heatmap, center, value, radius, is_offset=False):
   diameter = 2 * radius + 1
@@ -206,7 +205,7 @@ def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=
         for ind,(c,l )in enumerate(zip(centers,classes)):
             h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
             # print("h, w: ",h,w)
-            radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+            radius = gaussian_radius2((math.ceil(h), math.ceil(w)))
             # print("radius: ",radius)
             radius = max(0, int(radius))
             # print("radius: ",radius)
