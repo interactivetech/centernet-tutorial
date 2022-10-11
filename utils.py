@@ -44,6 +44,9 @@ def gaussian_radius(det_size, min_overlap=0.7):
   return min(r1, r2, r3)
 
 def gaussian_radius2(det_size, min_overlap):
+    '''
+    Fixes bug described in: https://github.com/xingyizhou/CenterNet/issues/273
+    '''
     height, width = det_size
 
     a1  = 1
