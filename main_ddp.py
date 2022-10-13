@@ -41,7 +41,7 @@ def main(args):
     'nccl',
         init_method='env://',
         world_size=4,
-        timeout=datetime.timedelta(seconds=7200),
+        timeout=datetime.timedelta(seconds=18000),
         rank=args.local_rank,
     )
     # ds = COCODetectionDataset('/mnt/18f3044b-5d9f-4d98-8083-e88a3cf4ab35/shapes_dataset/',

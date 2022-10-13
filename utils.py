@@ -201,7 +201,9 @@ def make_hm_regr_multiclass(bboxes,classes,N_CLASSES,input_size=512,MODEL_SCALE=
     try:
       # print("bboxes: ",bboxes.shape)
       if bboxes is not None:
-        centers = np.array([(bboxes[:,0]+bboxes[:,2])//2,(bboxes[:,1]+bboxes[:,3])//2,bboxes[:,2],bboxes[:,3]]).T
+        # bboxes are in x1,y1,w,h i.e. xywh coco coordinate
+        #xywh to [cx_cy_w_h = x1+w//2, y1+h//2, w, h]
+        centers = np.array([bboxes[:,0]+bboxes[:,2]//2,bboxes[:,1]+bboxes[:,3]//2,bboxes[:,2],bboxes[:,3]]).T
         for ind,(c,l )in enumerate(zip(centers,classes)):
             h, w = c[3]/MODEL_SCALE, c[2]/MODEL_SCALE
             # print("h, w: ",h,w)

@@ -165,7 +165,7 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                 pred_hm, pred_regs = model(img)# (4,1,128,128), (4,2,128,128)
                 pred_hm = torch.sigmoid(pred_hm)
 
-                for ind in range(pred_hm.shape[0]):
+                for ind in range(pred_hm.shape[0]):# batch size for val is always 1,C,H,W
                         try:
                             image_id = image_ids[ind]
                             # TODO(ANDREW): Make prediction done all in torch!
@@ -247,7 +247,7 @@ def val(model,val_ds,val_loader,writer,epoch,visualize_res=None,IMG_RESOLUTION=N
                         except Exception as e:
                             print(e)
                             continue
-                        break
+                        # break
     
 
     h,w =in_size[ind].numpy()

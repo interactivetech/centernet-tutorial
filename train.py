@@ -161,7 +161,7 @@ def train(architecture='mv3',
                 # if epoch > 0 and epoch%10==0:
                 # print(img.shape)
                 
-                if epoch > 0 and epoch%50==0:
+                if epoch > 0 and epoch%100==0:
                         # Val
                         if local_rank is not None and local_rank==0:
                                 val(model,val_ds,val_loader, writer,epoch,visualize_res=visualize_res,IMG_RESOLUTION=IMG_RESOLUTION,device=DEVICE)
